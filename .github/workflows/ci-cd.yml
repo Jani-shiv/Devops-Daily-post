@@ -1,0 +1,118 @@
+name: 🚀 Daily DevOps Diary CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # ─────────────────────────────────────
+  # Job 1: Lint & Build Backend
+  # ─────────────────────────────────────
+  backend:
+    name: 🔧 Backend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: npm ci
+        working-directory: ./server
+
+      - name: ✅ Verify server starts
+        run: |
+          timeout 10 node index.js &
+          sleep 5
+          curl -f http://localhost:5000/api/health || exit 1
+          kill %1 || true
+        working-directory: ./server
+        env:
+          DB_DIALECT: sqlite
+          JWT_SECRET: ci_test_secret
+
+  # ─────────────────────────────────────
+  # Job 2: Build Frontend
+  # ─────────────────────────────────────
+  frontend:
+    name: 🎨 Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: npm ci
+        working-directory: ./client
+
+      - name: 🏗️ Build production bundle
+        run: npm run build
+        working-directory: ./client
+
+      - name: 📊 Report bundle size
+        run: |
+          echo "### 📦 Build Output" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          du -sh dist/ >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Files:" >> $GITHUB_STEP_SUMMARY
+          find dist/ -type f -name "*.js" -o -name "*.css" | head -20 >> $GITHUB_STEP_SUMMARY
+        working-directory: ./client
+
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: client/dist/
+          retention-days: 7
+
+  # ─────────────────────────────────────
+  # Job 3: Docker Build (only on main)
+  # ─────────────────────────────────────
+  docker:
+    name: 🐳 Docker Build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build Server Image
+        run: docker build -f Dockerfile.server -t devops-diary-api:${{ github.sha }} ./server
+
+      - name: 🐳 Build Client Image
+        run: docker build -f Dockerfile.client -t devops-diary-web:${{ github.sha }} ./client
+
+      - name: ✅ Verify Docker Compose
+        run: docker compose config
+
+      - name: 📊 Report image sizes
+        run: |
+          echo "### 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | $(docker image inspect devops-diary-api:${{ github.sha }} --format='{{.Size}}' | numfmt --to=iec) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | $(docker image inspect devops-diary-web:${{ github.sha }} --format='{{.Size}}' | numfmt --to=iec) |" >> $GITHUB_STEP_SUMMARY

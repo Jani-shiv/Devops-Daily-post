@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: devops_diary_db
+    environment:
+      POSTGRES_DB: devops_diary
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: ../Dockerfile.server
+    container_name: devops_diary_api
+    environment:
+      PORT: 5000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: devops_diary
+      DB_USER: postgres
+      DB_PASS: postgres
+      JWT_SECRET: daily_devops_diary_prod_secret_2026
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: ../Dockerfile.client
+    container_name: devops_diary_web
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+volumes:
+  pgdata:
