@@ -1,115 +1,117 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
-import toast from 'react-hot-toast';
-
-const PLATFORMS = ['LinkedIn', 'Twitter', 'YouTube', 'Blog', 'Dev.to', 'Hashnode'];
-const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
 export default function Profile() {
-  const { user, setUser } = useAuth();
-  const [form, setForm] = useState({ name: '', brand_name: '', platforms: [], skill_level: 'Beginner' });
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ linkedinUrl: '', bio: '', goal: 30 });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    api.get('/profile').then(({ data }) => {
+      setProfile(data);
       setForm({
-        name: user.name || '',
-        brand_name: user.brand_name || '',
-        platforms: user.platforms || [],
-        skill_level: user.skill_level || 'Beginner',
+        linkedinUrl: data.linkedinUrl || '',
+        bio: data.bio || '',
+        goal: data.dailyGoal || 30,
       });
-    }
-  }, [user]);
+    }).catch(() => {});
+  }, []);
 
-  const togglePlatform = (p) => {
-    setForm((prev) => ({
-      ...prev,
-      platforms: prev.platforms.includes(p) ? prev.platforms.filter((x) => x !== p) : [...prev.platforms, p],
-    }));
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
+  const save = async () => {
     setSaving(true);
     try {
-      const { data } = await api.put('/profile', form);
-      setUser(data);
-      toast.success('Profile updated! ✅');
+      const { data } = await api.put('/profile', {
+        linkedinUrl: form.linkedinUrl,
+        bio: form.bio,
+        dailyGoal: form.goal,
+      });
+      setProfile(data);
+      setEditing(false);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save profile');
+      alert('Failed to save');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto animate-fade-in-up">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold gradient-text">Your Profile</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Set up your content creator brand</p>
-      </div>
+    <div className="page animate-in">
+      <h1 className="section-title">Profile</h1>
+      <p className="section-subtitle">Manage your account settings</p>
 
-      <div className="glass-card p-8">
-        <form onSubmit={handleSave}>
-          {/* Name */}
-          <div className="mb-5">
-            <label className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Full Name</label>
-            <input className="input-dark" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      {/* User Info Card */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'var(--green-bg)', border: '2px solid var(--green)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, fontWeight: 700, color: 'var(--green)',
+          }}>
+            {user?.name?.[0]?.toUpperCase() || '?'}
           </div>
-
-          {/* Brand */}
-          <div className="mb-5">
-            <label className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-1.5 block">Brand Name</label>
-            <input className="input-dark" placeholder="e.g. DevOps with John" value={form.brand_name} onChange={(e) => setForm({ ...form, brand_name: e.target.value })} />
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{user?.name}</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--gray)' }}>{user?.email}</p>
           </div>
+        </div>
 
-          {/* Skill Level */}
-          <div className="mb-5">
-            <label className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-2 block">Skill Level</label>
-            <div className="flex gap-3">
-              {SKILL_LEVELS.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => setForm({ ...form, skill_level: level })}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border cursor-pointer transition-all ${
-                    form.skill_level === level
-                      ? 'bg-[var(--accent-cyan)] text-[#0a0e1a] border-[var(--accent-cyan)]'
-                      : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-subtle)] hover:border-[var(--accent-cyan)]'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
+        <div className="divider" />
+
+        {!editing ? (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <span className="label">LinkedIn URL</span>
+              <p style={{ fontSize: '0.9rem', color: profile?.linkedinUrl ? 'var(--green)' : 'var(--gray-muted)' }}>
+                {profile?.linkedinUrl || 'Not set'}
+              </p>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span className="label">Bio</span>
+              <p style={{ fontSize: '0.9rem', color: profile?.bio ? 'var(--white-soft)' : 'var(--gray-muted)' }}>
+                {profile?.bio || 'No bio yet'}
+              </p>
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <span className="label">Daily Goal</span>
+              <p style={{ fontSize: '0.9rem' }}>
+                <span style={{ color: 'var(--green)', fontWeight: 600 }}>{profile?.dailyGoal || 30}</span>
+                <span style={{ color: 'var(--gray)' }}> days</span>
+              </p>
+            </div>
+            <button className="btn-secondary" onClick={() => setEditing(true)}>Edit Profile</button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">LinkedIn URL</label>
+              <input className="input" placeholder="https://linkedin.com/in/yourname" value={form.linkedinUrl} onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">Bio</label>
+              <textarea
+                className="input"
+                style={{ minHeight: 80, resize: 'vertical' }}
+                placeholder="Tell us about yourself..."
+                value={form.bio}
+                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <label className="label">Daily Goal (days)</label>
+              <input className="input" type="number" min="1" max="365" value={form.goal} onChange={(e) => setForm({ ...form, goal: parseInt(e.target.value) || 30 })} />
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button className="btn-primary" onClick={save} disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button className="btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
             </div>
           </div>
-
-          {/* Platforms */}
-          <div className="mb-8">
-            <label className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-2 block">Platforms You Post On</label>
-            <div className="flex flex-wrap gap-2">
-              {PLATFORMS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => togglePlatform(p)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium border cursor-pointer transition-all ${
-                    form.platforms.includes(p)
-                      ? 'bg-[rgba(139,92,246,0.2)] text-[var(--accent-purple)] border-[var(--accent-purple)]'
-                      : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-subtle)] hover:border-[var(--accent-purple)]'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button type="submit" disabled={saving} className="btn-glow w-full flex items-center justify-center gap-2">
-            {saving ? <div className="w-5 h-5 border-2 border-[#0a0e1a] border-t-transparent rounded-full animate-spin" /> : 'Save Profile'}
-          </button>
-        </form>
+        )}
       </div>
     </div>
   );
