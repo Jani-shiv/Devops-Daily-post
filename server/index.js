@@ -16,7 +16,10 @@ const progressRoutes = require('./routes/progress');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true,
+}));
 app.use(express.json());
 
 // Routes
@@ -53,7 +56,7 @@ async function start() {
     }
 
     app.listen(PORT, () => {
-      console.log(`🚀 Daily DevOps Diary API running on http://localhost:${PORT}`);
+      console.log(`🚀 Daily DevOps Diary API running on port ${PORT}`);
     });
   } catch (err) {
     console.error('❌ Failed to start server:', err.message);
