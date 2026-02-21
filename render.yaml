@@ -34,7 +34,6 @@ services:
   - type: web
     name: devops-diary
     runtime: static
-    plan: free
     buildCommand: cd client && rm -rf node_modules package-lock.json && npm install && npm run build
     staticPublishPath: client/dist
     envVars:
