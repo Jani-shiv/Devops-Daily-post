@@ -100,10 +100,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🐳 Build Server Image
-        run: docker build -f Dockerfile.server -t devops-diary-api:${{ github.sha }} ./server
+        run: docker build -f Dockerfile.server -t devops-diary-api:${{ github.sha }} .
 
       - name: 🐳 Build Client Image
-        run: docker build -f Dockerfile.client -t devops-diary-web:${{ github.sha }} ./client
+        run: docker build -f Dockerfile.client -t devops-diary-web:${{ github.sha }} .
+
+      - name: 🔍 Verify Node version in images
+        run: |
+          docker run --rm devops-diary-api:${{ github.sha }} node --version
+          echo "Server image Node version verified"
 
       - name: ✅ Verify Docker Compose
         run: docker compose config
